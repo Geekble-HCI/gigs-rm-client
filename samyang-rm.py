@@ -63,8 +63,6 @@ def read_serial():
                 try:
                     value = float(line.split(":")[1].strip())
                     # TCP로 RPM 데이터 전송
-                    if tcp_handler.is_ready():
-                        tcp_handler.send_message(str(value))
                     now = time.time()
                     raw_rpm_values.append(value)
                     time_values.append(now)
@@ -92,7 +90,7 @@ def read_serial():
                     total_kcal = float(line.split(":")[1].strip())
                     # TCP로 kCal 데이터 전송
                     if tcp_handler.is_ready():
-                        tcp_handler.send_message(str(total_kcal))
+                        tcp_handler.send_message(str(total_kcal/30))
                     kcal_time.append(time.time())
                     kcal_values.append(total_kcal)
                 except ValueError:
