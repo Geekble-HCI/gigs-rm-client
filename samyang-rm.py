@@ -44,7 +44,7 @@ tcp_handler = TCPHandler(handle_tcp_message)
 
 # ========== SERIAL READER THREAD ==========
 def read_serial():
-    global total_kcal
+    global total_kcal, previous_kcal  # previous_kcal를 global로 추가
     # TCP 연결 시도
     tcp_handler.setup()
     tcp_handler.start_monitoring()
