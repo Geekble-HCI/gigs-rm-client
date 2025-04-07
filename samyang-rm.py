@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from collections import deque
 import numpy as np
+from Module.tcp_handler import TCPHandler
 
 # ========== CONFIG ==========
 BAUD_RATE = 115200
@@ -34,9 +35,19 @@ kcal_time = deque()
 kcal_values = deque()
 total_kcal = 0.0
 
+# ========== TCP HANDLER ==========
+def handle_tcp_message(message):
+    print(f"[Received] {message}")
+
+tcp_handler = TCPHandler(handle_tcp_message)
+
 # ========== SERIAL READER THREAD ==========
 def read_serial():
     global total_kcal
+    # TCP 연결 시도
+    tcp_handler.setup()
+    tcp_handler.start_monitoring()
+    
     try:
         ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
     except Exception as e:
@@ -51,6 +62,9 @@ def read_serial():
             if line.startswith("RPM:"):
                 try:
                     value = float(line.split(":")[1].strip())
+                    # TCP로 RPM 데이터 전송
+                    if tcp_handler.is_ready():
+                        tcp_handler.send_message(str(value))
                     now = time.time()
                     raw_rpm_values.append(value)
                     time_values.append(now)
@@ -76,6 +90,9 @@ def read_serial():
             elif line.startswith("kCal:"):
                 try:
                     total_kcal = float(line.split(":")[1].strip())
+                    # TCP로 kCal 데이터 전송
+                    if tcp_handler.is_ready():
+                        tcp_handler.send_message(str(total_kcal))
                     kcal_time.append(time.time())
                     kcal_values.append(total_kcal)
                 except ValueError:
@@ -155,4 +172,9 @@ except:
         pass
 
 plt.tight_layout()
-plt.show()
+
+# 프로그램 종료 시 TCP 연결 정리
+try:
+    plt.show()
+finally:
+    tcp_handler.cleanup()
