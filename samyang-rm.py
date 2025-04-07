@@ -34,6 +34,7 @@ time_values = deque()
 kcal_time = deque()
 kcal_values = deque()
 total_kcal = 0.0
+previous_kcal = 0.0  # 이전 칼로리 값 저장 변수 추가
 
 # ========== TCP HANDLER ==========
 def handle_tcp_message(message):
@@ -88,9 +89,12 @@ def read_serial():
             elif line.startswith("kCal:"):
                 try:
                     total_kcal = float(line.split(":")[1].strip())
-                    # TCP로 kCal 데이터 전송
+                    # TCP로 증가된 kCal 데이터만 전송
                     if tcp_handler.is_ready():
-                        tcp_handler.send_message(str(total_kcal/30))
+                        kcal_diff = total_kcal - previous_kcal
+                        if kcal_diff > 0:  # 증가된 경우에만 전송
+                            tcp_handler.send_message(str(kcal_diff))
+                    previous_kcal = total_kcal  # 이전 값 업데이트
                     kcal_time.append(time.time())
                     kcal_values.append(total_kcal)
                 except ValueError:
