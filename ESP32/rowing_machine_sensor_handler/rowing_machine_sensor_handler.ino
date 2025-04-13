@@ -4,7 +4,7 @@
 
 /* --- Config --- */
 #define ESPNOW_WIFI_CHANNEL     11
-#define SEND_INTERVAL_MS        20
+#define SEND_INTERVAL_MS        200    // 100ms에서 200ms로 변경
 #define HALL_SENSOR_PIN         1
 #define PULSES_PER_REV          4
 #define PULSE_REPORT_INTERVAL_MS 100
@@ -110,14 +110,20 @@ void setup() {
 
 /* --- Loop --- */
 void loop() {
-  if (millis() - lastSent >= SEND_INTERVAL_MS) {
-    lastSent = millis();
-
+  unsigned long currentMillis = millis();
+  
+  // RPM 계산은 50ms 간격으로 수행 (더 자주 할 필요 없음)
+  if (currentMillis - lastRPMUpdate >= 50) {
     currentRPM = calculateRPM();
     rpmHistory[rpmIndex] = currentRPM;
     rpmIndex = (rpmIndex + 1) % RPM_SMOOTH_COUNT;
     if (rpmIndex == 0) rpmFilled = true;
+    lastRPMUpdate = currentMillis;
+  }
 
+  // 전송은 더 긴 간격으로 수행
+  if (currentMillis - lastSent >= SEND_INTERVAL_MS) {
+    lastSent = currentMillis;
     float avgRPM = getMovingAverage();
 
     message_t msg;
