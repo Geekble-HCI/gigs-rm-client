@@ -104,7 +104,8 @@ def read_serial():
 
                     # TCP로 증가된 kCal 데이터 전송
                     if tcp_handler.is_ready():
-                        tcp_handler.send_message(str(kcal_increment))
+                        if kcal_increment > 0:
+                            tcp_handler.send_message(str(kcal_increment))
 
                     previous_kcal = total_kcal
                     kcal_time.append(now)
