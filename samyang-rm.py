@@ -123,16 +123,7 @@ def animate_rpm(i):
     if time_values:
         x = np.array([t - time_values[0] for t in time_values])
         y = list(smooth_rpm_values)
-
-        # sine wave-like interpolation
-        if len(x) > 3:
-            xnew = np.linspace(x[0], x[-1], 200)
-            ynew = np.interp(xnew, x, y)
-            ynew = np.array(ynew)
-            ynew = np.convolve(ynew, np.ones(5)/5, mode='same')
-            ax_rpm.plot(xnew, ynew, label="RPM")
-        else:
-            ax_rpm.plot(x, y, label="RPM")
+        ax_rpm.plot(x, y, label="RPM")
 
     ax_rpm.set_ylim(0, MAX_RPM_Y)
     ax_rpm.set_title("Real-Time Average RPM")
