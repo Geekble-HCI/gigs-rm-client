@@ -13,6 +13,7 @@ BAUD_RATE = 115200
 MOVING_AVERAGE_WINDOW = 5
 PLOT_INTERVAL_MS = 500
 MAX_RPM_Y = 1200
+KCAL_PER_RPM_PER_MINUTE = 0.001  # 칼로리 계산 계수 추가
 
 # ========== AUTO-DETECT SERIAL PORT ==========
 def find_serial_port():
@@ -44,7 +45,7 @@ tcp_handler = TCPHandler(handle_tcp_message)
 
 # ========== SERIAL READER THREAD ==========
 def read_serial():
-    global total_kcal, previous_kcal  # previous_kcal를 global로 추가
+    global total_kcal, previous_kcal
     # TCP 연결 시도
     tcp_handler.setup()
     tcp_handler.start_monitoring()
@@ -56,6 +57,7 @@ def read_serial():
         return
 
     print(f"✅ Connected to {SERIAL_PORT}")
+    last_kcal_update = time.time()  # 마지막 칼로리 업데이트 시간
 
     while True:
         try:
@@ -63,7 +65,6 @@ def read_serial():
             if line.startswith("RPM:"):
                 try:
                     value = float(line.split(":")[1].strip())
-                    # TCP로 RPM 데이터 전송
                     now = time.time()
                     raw_rpm_values.append(value)
                     time_values.append(now)
@@ -79,24 +80,21 @@ def read_serial():
                     while time_values and (now - time_values[0]) > 60:
                         time_values.popleft()
                         smooth_rpm_values.popleft()
-                except ValueError:
-                    pass
 
-            elif line.startswith("PULSE:"):
-                # Ignore if kcal isn't provided
-                pass
+                    # Calculate calories based on RPM
+                    time_diff = now - last_kcal_update
+                    kcal_increment = smoothed * KCAL_PER_RPM_PER_MINUTE * (time_diff / 60)
+                    total_kcal += kcal_increment
 
-            elif line.startswith("kCal:"):
-                try:
-                    total_kcal = float(line.split(":")[1].strip())
-                    # TCP로 증가된 kCal 데이터만 전송
+                    # TCP로 증가된 kCal 데이터 전송
                     if tcp_handler.is_ready():
-                        kcal_diff = total_kcal - previous_kcal
-                        if kcal_diff > 0:  # 증가된 경우에만 전송
-                            tcp_handler.send_message(str(kcal_diff))
-                    previous_kcal = total_kcal  # 이전 값 업데이트
-                    kcal_time.append(time.time())
+                        tcp_handler.send_message(str(kcal_increment))
+
+                    previous_kcal = total_kcal
+                    kcal_time.append(now)
                     kcal_values.append(total_kcal)
+                    last_kcal_update = now
+
                 except ValueError:
                     pass
         except Exception as e:
