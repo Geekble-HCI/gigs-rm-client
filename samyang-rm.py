@@ -37,9 +37,25 @@ kcal_values = deque()
 total_kcal = 0.0
 previous_kcal = 0.0  # 이전 칼로리 값 저장 변수 추가
 
+# ========== DATA RESET ==========
+def reset_data():
+    global raw_rpm_values, smooth_rpm_values, time_values, kcal_time, kcal_values, total_kcal, previous_kcal
+    raw_rpm_values.clear()
+    smooth_rpm_values.clear()
+    time_values.clear()
+    kcal_time.clear()
+    kcal_values.clear()
+    total_kcal = 0.0
+    previous_kcal = 0.0
+
 # ========== TCP HANDLER ==========
 def handle_tcp_message(message):
     print(f"[Received] {message}")
+    try:
+        if float(message) == -1:
+            reset_data()
+    except ValueError:
+        pass
 
 tcp_handler = TCPHandler(handle_tcp_message)
 
@@ -145,6 +161,11 @@ def animate_text(i):
                  fontsize=50, ha='center', va='center', fontweight='bold')
     ax_text.axis("off")
 
+# ========== KEYBOARD EVENT HANDLER ==========
+def on_key(event):
+    if event.key == 'a':
+        reset_data()
+
 # ========== WINDOWS ==========
 fig = plt.figure(figsize=(16, 9))
 gs = fig.add_gridspec(2, 2, width_ratios=[2, 1])
@@ -152,6 +173,9 @@ gs = fig.add_gridspec(2, 2, width_ratios=[2, 1])
 ax_rpm = fig.add_subplot(gs[:, 0])
 ax_text = fig.add_subplot(gs[0, 1])
 ax_kcal = fig.add_subplot(gs[1, 1])
+
+# 키보드 이벤트 리스너 추가
+fig.canvas.mpl_connect('key_press_event', on_key)
 
 ani_rpm = FuncAnimation(fig, animate_rpm, interval=PLOT_INTERVAL_MS, cache_frame_data=False)
 ani_text = FuncAnimation(fig, animate_text, interval=PLOT_INTERVAL_MS, cache_frame_data=False)
