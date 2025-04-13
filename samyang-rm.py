@@ -13,7 +13,7 @@ BAUD_RATE = 115200
 MOVING_AVERAGE_WINDOW = 5
 PLOT_INTERVAL_MS = 500
 MAX_RPM_Y = 1200
-KCAL_PER_RPM_PER_MINUTE = 0.01  # 칼로리 계산 계수 추가
+KCAL_PER_RPM_PER_MINUTE = 0.1  # 칼로리 계산 계수 추가
 
 # ========== AUTO-DETECT SERIAL PORT ==========
 def find_serial_port():
