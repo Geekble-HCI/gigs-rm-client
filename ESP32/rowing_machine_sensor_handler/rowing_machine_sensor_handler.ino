@@ -137,7 +137,7 @@ void loop() {
     unsigned long currentTotal = totalPulses;
     interrupts();
     float kcal = currentTotal / (float)PULSES_PER_KCAL;
-    Serial.printf("PULSE: %lu\tKCAL: %.2f\n", currentTotal, kcal);
+    // Serial.printf("PULSE: %lu\tKCAL: %.2f\n", currentTotal, kcal);
 
     // Trigger next box if kcal exceeds threshold
     float targetKcal = KCAL_THRESHOLD_STEP * (openedBoxCount + 1);
