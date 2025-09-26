@@ -1,32 +1,16 @@
-import serial
-import serial.tools.list_ports
-import threading
 import time
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from collections import deque
 import numpy as np
-from Module.tcp_handler import TCPHandler
+from Module.serial_handler import SerialHandler
 
 # ========== CONFIG ==========
-BAUD_RATE = 115200
 MOVING_AVERAGE_WINDOW = 5
 PLOT_INTERVAL_MS = 500
 MAX_RPM_Y = 1200
-KCAL_PER_RPM_PER_MINUTE = 0.15  # 칼로리 계산 계수 추가
+KCAL_PER_RPM_PER_MINUTE = 0.15
 
-# ========== AUTO-DETECT SERIAL PORT ==========
-def find_serial_port():
-    ports = list(serial.tools.list_ports.comports())
-    for p in ports:
-        if any(x in p.device for x in ["ttyUSB", "ttyACM", "serial", "AMA", "USB"]):
-            return p.device
-    return None
-
-SERIAL_PORT = find_serial_port()
-if not SERIAL_PORT:
-    print("❌ No serial device found.")
-    exit()
 
 # ========== DATA STORAGE ==========
 raw_rpm_values = deque()
@@ -48,74 +32,60 @@ def reset_data():
     total_kcal = 0.0
     previous_kcal = 0.0
 
-# ========== TCP HANDLER ==========
-def handle_tcp_message(message):
-    print(f"[Received] {message}")
+# ========== SERIAL HANDLER ==========
+def handle_serial_event(event):
+    print(f"[Received] {event.raw}")
     try:
-        if float(message) == -1:
+        # 리셋 명령 처리
+        if float(event.raw) == -1:
             reset_data()
-    except ValueError:
+            return
+        
+        # RPM 데이터 처리
+        if event.raw.startswith("RPM:"):
+            rpm_value = float(event.raw.split(":")[1].strip())
+            process_rpm_data(rpm_value)
+    except (ValueError, AttributeError):
         pass
 
-tcp_handler = TCPHandler(handle_tcp_message)
+serial_handler = SerialHandler(on_event=handle_serial_event)
 
-# ========== SERIAL READER THREAD ==========
-def read_serial():
-    global total_kcal, previous_kcal
-    # TCP 연결 시도
-    tcp_handler.setup()
-    tcp_handler.start_monitoring()
+# ========== RPM DATA PROCESSING ==========
+last_kcal_update = time.time()
+
+def process_rpm_data(rpm_value):
+    global total_kcal, previous_kcal, last_kcal_update
     
-    try:
-        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-    except Exception as e:
-        print("❌ Serial error:", e)
-        return
+    now = time.time()
+    raw_rpm_values.append(rpm_value)
+    time_values.append(now)
 
-    print(f"✅ Connected to {SERIAL_PORT}")
-    last_kcal_update = time.time()  # 마지막 칼로리 업데이트 시간
+    # Apply moving average
+    window = list(raw_rpm_values)[-MOVING_AVERAGE_WINDOW:]
+    smoothed = sum(window) / len(window)
+    smooth_rpm_values.append(smoothed)
 
-    while True:
-        try:
-            line = ser.readline().decode('utf-8', errors='ignore').strip()
-            if line.startswith("RPM:"):
-                try:
-                    value = float(line.split(":")[1].strip())
-                    now = time.time()
-                    raw_rpm_values.append(value)
-                    time_values.append(now)
+    # Keep only matching timestamps
+    while len(smooth_rpm_values) > len(time_values):
+        smooth_rpm_values.popleft()
+    while time_values and (now - time_values[0]) > 60:
+        time_values.popleft()
+        smooth_rpm_values.popleft()
 
-                    # Apply moving average
-                    window = list(raw_rpm_values)[-MOVING_AVERAGE_WINDOW:]
-                    smoothed = sum(window) / len(window)
-                    smooth_rpm_values.append(smoothed)
+    # Calculate calories based on RPM
+    time_diff = now - last_kcal_update
+    kcal_increment = smoothed * KCAL_PER_RPM_PER_MINUTE * (time_diff / 60)
+    total_kcal += kcal_increment
 
-                    # Keep only matching timestamps
-                    while len(smooth_rpm_values) > len(time_values):
-                        smooth_rpm_values.popleft()
-                    while time_values and (now - time_values[0]) > 60:
-                        time_values.popleft()
-                        smooth_rpm_values.popleft()
+    # Serial로 증가된 kCal 데이터 전송
+    if serial_handler.is_ready():
+        if kcal_increment > 0:
+            serial_handler.send_message(str(kcal_increment))
 
-                    # Calculate calories based on RPM
-                    time_diff = now - last_kcal_update
-                    kcal_increment = smoothed * KCAL_PER_RPM_PER_MINUTE * (time_diff / 60)
-                    total_kcal += kcal_increment
-
-                    # TCP로 증가된 kCal 데이터 전송
-                    if tcp_handler.is_ready():
-                        if kcal_increment > 0:
-                            tcp_handler.send_message(str(kcal_increment))
-
-                    previous_kcal = total_kcal
-                    kcal_time.append(now)
-                    kcal_values.append(total_kcal)
-                    last_kcal_update = now
-
-                except ValueError:
-                    pass
-        except Exception as e:
-            print("⚠️ Serial read error:", e)
+    previous_kcal = total_kcal
+    kcal_time.append(now)
+    kcal_values.append(total_kcal)
+    last_kcal_update = now
 
 # ========== PLOTS ==========
 
@@ -173,9 +143,8 @@ ani_rpm = FuncAnimation(fig, animate_rpm, interval=PLOT_INTERVAL_MS, cache_frame
 ani_text = FuncAnimation(fig, animate_text, interval=PLOT_INTERVAL_MS, cache_frame_data=False)
 ani_kcal = FuncAnimation(fig, animate_kcal, interval=PLOT_INTERVAL_MS, cache_frame_data=False)
 
-# ========== START THREAD ==========
-serial_thread = threading.Thread(target=read_serial, daemon=True)
-serial_thread.start()
+# ========== SERIAL HANDLER INITIALIZATION ==========
+# SerialHandler는 생성 시 자동으로 포트 연결 및 모니터링 시작
 
 # Fullscreen and resizable layout
 mng = plt.get_current_fig_manager()
@@ -189,8 +158,8 @@ except:
 
 plt.tight_layout()
 
-# 프로그램 종료 시 TCP 연결 정리
+# 프로그램 종료 시 Serial 연결 정리
 try:
     plt.show()
 finally:
-    tcp_handler.cleanup()
+    serial_handler.cleanup()
