@@ -34,19 +34,31 @@ def reset_data():
 
 # ========== SERIAL HANDLER ==========
 def handle_serial_data(data):
-    print(f"[Received] {data}")
+    print(f"[Received] '{data}' (len={len(data)})")
+    print(f"[DEBUG] Data repr: {repr(data)}")
+    print(f"[DEBUG] Starts with 'RPM:'? {data.startswith('RPM:')}")
+    
     try:
         # 리셋 명령 처리
         if float(data) == -1:
             reset_data()
             return
-        
+    except ValueError:
+        pass
+    
+    try:
         # RPM 데이터 처리
         if data.startswith("RPM:"):
-            rpm_value = float(data.split(":")[1].strip())
+            print(f"[DEBUG] Parsing RPM data: {data}")
+            rpm_part = data.split(":")[1].strip()
+            print(f"[DEBUG] RPM part after split: '{rpm_part}'")
+            rpm_value = float(rpm_part)
+            print(f"[DEBUG] Parsed RPM value: {rpm_value}")
             process_rpm_data(rpm_value)
-    except (ValueError, AttributeError):
-        pass
+        else:
+            print(f"[DEBUG] Data does not start with 'RPM:', skipping")
+    except (ValueError, IndexError) as e:
+        print(f"[DEBUG] Error parsing RPM data: {e}")
 
 serial_handler = SerialHandler(on_data=handle_serial_data)
 
