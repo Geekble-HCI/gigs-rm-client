@@ -56,6 +56,7 @@ last_kcal_update = time.time()
 def process_rpm_data(rpm_value):
     global total_kcal, previous_kcal, last_kcal_update
     
+    print(f"[DEBUG] Processing RPM: {rpm_value}")
     now = time.time()
     raw_rpm_values.append(rpm_value)
     time_values.append(now)
@@ -64,6 +65,8 @@ def process_rpm_data(rpm_value):
     window = list(raw_rpm_values)[-MOVING_AVERAGE_WINDOW:]
     smoothed = sum(window) / len(window)
     smooth_rpm_values.append(smoothed)
+    
+    print(f"[DEBUG] Data lengths - raw_rpm: {len(raw_rpm_values)}, smooth_rpm: {len(smooth_rpm_values)}, time: {len(time_values)}")
 
     # Keep only matching timestamps
     while len(smooth_rpm_values) > len(time_values):
