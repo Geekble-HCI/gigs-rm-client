@@ -1,5 +1,3 @@
-from sched import Event
-from .events import GameEvent, EventType, InputSource
 from typing import Callable, Optional
 import serial
 import serial.tools.list_ports
@@ -7,7 +5,7 @@ import threading
 import time
 
 class SerialHandler:
-    def __init__(self, gigs_instance=None, on_event: Optional[Callable[[Event], None]] = None):
+    def __init__(self, on_data: Optional[Callable[[str], None]] = None):
         self.serial_ports = {}  # 여러 시리얼 포트를 저장하는 딕셔너리
         self.excluded_ports = [
             '/dev/cu.debug-console',
@@ -19,8 +17,7 @@ class SerialHandler:
         ]
         self.is_connected = False
         self.setup_thread = None
-        self._gigs = gigs_instance  # GIGS 인스턴스 참조
-        self._on_event = on_event  # 외부 이벤트 전달
+        self._on_data = on_data  # 외부 데이터 콜백
 
         # 객체 생성 시 자동으로 포트 연결 시도
         self.setup()
@@ -80,29 +77,9 @@ class SerialHandler:
 
         threading.Thread(target=port_monitor, daemon=True).start()
     
-    # 시리얼 분기 -> 메서드 추출
     def _dispatch_serial_input(self, received_data: str):
-        ev = self._parse_serial_data(received_data)
-        if ev and self._on_event:
-            self._on_event(ev)
-
-    # 파싱만 책임 (상태 전환 X)
-    def _parse_serial_data(self, s: str):
-        if not s:
-            return None
-        # 8자리 영숫자 → RFID
-        if len(s) == 8 and s.isalnum():
-            return GameEvent(kind=EventType.RFID_DETECTED, source=InputSource.SERIAL, raw=s)
-        # 레거시 'a' → RFID
-        if s == 'a':
-            return GameEvent(kind=EventType.RFID_DETECTED, source=InputSource.SERIAL, raw=s)
-        # 숫자 (정수 또는 소수점) → 점수
-        try:
-            score_value = float(s)
-            return GameEvent(kind=EventType.SCORE_RECEIVED, source=InputSource.SERIAL, raw=s, score=score_value)
-        except ValueError:
-            pass
-        return GameEvent(kind=EventType.UNKNOWN, source=InputSource.SERIAL, raw=s)
+        if self._on_data:
+            self._on_data(received_data)
 
     def is_ready(self):
         """하나 이상의 시리얼 연결이 준비되었는지 확인"""

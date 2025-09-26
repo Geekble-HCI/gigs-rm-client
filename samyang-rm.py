@@ -33,22 +33,22 @@ def reset_data():
     previous_kcal = 0.0
 
 # ========== SERIAL HANDLER ==========
-def handle_serial_event(event):
-    print(f"[Received] {event.raw}")
+def handle_serial_data(data):
+    print(f"[Received] {data}")
     try:
         # 리셋 명령 처리
-        if float(event.raw) == -1:
+        if float(data) == -1:
             reset_data()
             return
         
         # RPM 데이터 처리
-        if event.raw.startswith("RPM:"):
-            rpm_value = float(event.raw.split(":")[1].strip())
+        if data.startswith("RPM:"):
+            rpm_value = float(data.split(":")[1].strip())
             process_rpm_data(rpm_value)
     except (ValueError, AttributeError):
         pass
 
-serial_handler = SerialHandler(on_event=handle_serial_event)
+serial_handler = SerialHandler(on_data=handle_serial_data)
 
 # ========== RPM DATA PROCESSING ==========
 last_kcal_update = time.time()
